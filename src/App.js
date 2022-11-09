@@ -1,114 +1,97 @@
-import logo from './logo.svg';
+import '@fontsource/roboto/400.css';
 import './App.css';
 import React from "react";
 
 
 import CV_data from "./CV_data";
 
-import {Box, Grid} from "@mui/material";
-import PropTypes, {instanceOf} from "prop-types";
+import {Divider, Grid, List, ListItem, ListItemIcon, ListItemText, Typography} from "@mui/material";
+import PropTypes from "prop-types";
 import {Timeline, TimelineConnector, TimelineContent, TimelineDot, TimelineItem, TimelineSeparator} from "@mui/lab";
-import {getExperienceTime, getTotalExperience} from "./utils";
+import {getContiniousTenure, getExperienceTime, getTotalExperience, renderTenureTime} from "./utils";
+import {CircleOutlined} from "@mui/icons-material";
+import {createTheme, ThemeProvider} from '@mui/material/styles';
+
+const theme = createTheme({
+    palette: {
+        type: 'light', primary: {
+            main: '#3f51b5',
+        }, secondary: {
+            main: '#f50057',
+        },
+    }, typography: {
+        fontSize: 12,
+    },
+});
 
 
-class CVExpItem extends React.Component {
-    propTypes = {
-        company: PropTypes.string,
-        location: PropTypes.string,
-        isRemote: PropTypes.bool,
-        position: PropTypes.string,
-
+class CVMain extends React.Component {
+    static propTypes = {
+        name: PropTypes.string, surname: PropTypes.string, dob: PropTypes.string, experience: PropTypes.object
     }
 
     constructor(props) {
         super(props);
-        this.data = CV_data.experience[0];
-        let x = new ExperienceTimeline();
+        this.experience = new ExperienceTimeline();
     }
 
-    renderTimelineElement(pair) {
-        return [
-            <TimelineItem>
-                <TimelineSeparator>
-                    <TimelineDot/>
-                    <TimelineConnector/>
-                </TimelineSeparator>
-                <TimelineContent>{pair[0]}</TimelineContent>
-            </TimelineItem>,
-            <TimelineItem>
-                <TimelineSeparator>
-                    <TimelineDot/>
-                </TimelineSeparator>
-                <TimelineContent>{pair[1]}</TimelineContent>
-            </TimelineItem>
-        ]
-    }
-
-    renderTimeline(timeline) {
-        timeline = [
-            ["Aug 2023", "May 2021"],
-            ["Jan 2021", "Sep 2020"],
-            ["Nov 1998", "Jan 1996"]
-        ]
-        let content = []
-        for (const timelineElement of timeline) {
-            content.push(...this.renderTimelineElement(timelineElement))
-        }
+    renderExperienceItems() {
         return (
-            <Timeline>
-                {content}
-            </Timeline>
+            <List>
+                {this.experience.experiences.map((e) => this.renderExperienceItem(e))}
+            </List>
+        )
+    }
+
+    /**
+     *
+     * @param experienceItem
+     * @type ExperienceItem
+     *
+     * @return JSX.Element
+     */
+    renderExperienceItem(experienceItem) {
+        return ([
+                <ListItem>
+                    <CVExpItem experience={experienceItem}/>
+                </ListItem>,
+                <Divider variant="middle" component="li"/>,
+
+            ]
+
         )
     }
 
     render() {
         return (
-            <Grid container spacing={2}>
-                <Grid item xs={4}>
-                    <h3>5 Years</h3>
-                    <Timeline>
-                        {this.renderTimeline()}
-                    </Timeline>
+            <Grid>
+                <Grid>
+                    <Typography variant="h6" align="left">
+                        Total experience: {renderTenureTime(this.experience.totalTenureConcurrent)}
+                    </Typography>
                 </Grid>
-                <Grid item xs={8}></Grid>
-            </Grid>
-        )
-    }
-}
+                <Grid>
+                    <Divider variant="fullWidth"/>
+                    {this.renderExperienceItems()}
+                </Grid>
 
-class CVMain extends React.Component {
-    propTypes = {
-        name: PropTypes.string,
-        surname: PropTypes.string,
-        dob: PropTypes.string,
-        experience: PropTypes.object
-    }
-
-    constructor(props) {
-        super(props);
+            </Grid>)
+        // return this.renderExperienceItems()
     }
 }
 
 class ExperienceItem {
-    constructor(
-        {
-            company,
-            location,
-            website,
-            position,
-            start_date,
-            end_date,
-            description,
-            link_id,
-            link_to
-        }
-    ) {
-        console.log(company)
+    constructor({
+                    company, location, website, position, start_date, end_date, description, link_id, link_to
+                }) {
         this.company_name = company
         this.location = location
         this.position = position
-        this.start_date = new Date(start_date)
-        this.end_date = new Date(end_date)
+        this.start_date = {date: new Date(start_date), text: start_date}
+        console.log(end_date)
+        this.end_date = end_date === undefined ? {date: new Date(), text: "currently"} : {
+            date: new Date(end_date), text: end_date
+        }
         this.description = description
         this.link_id = link_id
         this.link_to = link_to
@@ -129,10 +112,22 @@ class ExperienceItem {
     }
 
     getCoreExperienceDuration() {
-        return getExperienceTime(this.start_date, this.end_date)
+        return getExperienceTime(this.start_date.date, this.end_date.date)
+    }
+
+    getFullTimeline() {
+        const timeline = [[this.start_date.text, this.end_date.text],];
+        for (const linkedPosition of this.linkedPositions) {
+            timeline.push([linkedPosition.start_date.text, linkedPosition.end_date.text])
+        }
+
+        return timeline
     }
 
     getTotalExperienceLength() {
+        /**
+         * @type Array[ExperienceItem]
+         */
         let experiencesDurations = []
         experiencesDurations.push(this.getCoreExperienceDuration())
 
@@ -140,7 +135,7 @@ class ExperienceItem {
             experiencesDurations.push(linkedPosition.getCoreExperienceDuration())
         }
 
-        return getTotalExperience(experiencesDurations)
+        return getTotalExperience(...experiencesDurations)
     }
 }
 
@@ -151,8 +146,8 @@ class ExperienceTimeline {
         const expectedLinks = {}
         const links = {}
         let experiences = []
+        let tenureCollection = []
         for (const experienceItem of experienceItems) {
-            console.log(experienceItem)
             const expItem = new ExperienceItem(experienceItem)
             experiences.push(expItem)
             if (expItem.link_to != null) {
@@ -161,23 +156,23 @@ class ExperienceTimeline {
             if (expItem.link_id != null) {
                 links[expItem.link_id] = expItem
             }
+            tenureCollection.push(expItem.getCoreExperienceDuration())
         }
+        this.totalTenureConcurrent = getTotalExperience(...tenureCollection)
 
         for (const expectedLinksKey in expectedLinks) {
             expectedLinks[expectedLinksKey].addLinkedExperiences(links[expectedLinksKey])
         }
 
-        experiences.sort(
-            (a, b) => {
-                if (a.start_date > b.start_date)
-                    return 1
-                if (a.start_date === b.start_date)
-                    return 0
-                return -1
-            }
-        )
+        experiences.sort((a, b) => {
+            return (a.start_date.date - b.start_date.date) * -1
+        })
 
-        console.log(experiences)
+        let exps = experiences.map(e => [e.start_date.date, e.end_date.date]).reverse()
+        this.totalTenureDirect = getContiniousTenure(...exps)
+
+
+
         this.experiences = experiences
 
     }
@@ -185,13 +180,102 @@ class ExperienceTimeline {
 
 }
 
+class CVExpItem extends React.Component {
+    static propTypes = {
+        experience: PropTypes.instanceOf(ExperienceItem)
+    }
+
+    constructor(props) {
+        super(props);
+        this.experience = props.experience
+    }
+
+    renderTimelineElement(pair) {
+        return [<TimelineItem>
+            <TimelineSeparator>
+                <TimelineDot/>
+                <TimelineConnector/>
+            </TimelineSeparator>
+            <TimelineContent>{pair[1]}</TimelineContent>
+        </TimelineItem>, <TimelineItem>
+            <TimelineSeparator>
+                <TimelineDot/>
+            </TimelineSeparator>
+            <TimelineContent>{pair[0]}</TimelineContent>
+        </TimelineItem>]
+    }
+
+    renderTimeline() {
+        const timeline = this.experience.getFullTimeline()
+        let content = []
+        for (const timelineElement of timeline) {
+            content.push(...this.renderTimelineElement(timelineElement))
+        }
+        return (<Timeline>
+            {content}
+        </Timeline>)
+    }
+
+    renderDescription() {
+        return (<List>
+            {this.experience.description.map(line => <ListItem disablePadding>
+                <ListItemIcon>
+                    <CircleOutlined/>
+                </ListItemIcon>
+                <ListItemText>
+                    {line}
+                </ListItemText>
+            </ListItem>)}
+        </List>)
+    }
+
+
+    renderWebsite() {
+        if (this.experience.website === undefined)
+            return ""
+        return (
+            <Typography>{"Website: "}
+                {this.experience.websiteIsActive ?
+                    <a href={"http://" + this.experience.website}>{this.experience.website}</a>
+                    :
+                    this.experience.website
+                }
+            </Typography>
+        )
+    }
+
+    render() {
+        return (<Grid container spacing={2}>
+            <Grid item xs={2}>
+                <Typography>
+                    {renderTenureTime(this.experience.getTotalExperienceLength())}
+                </Typography>
+                <Timeline>
+                    {this.renderTimeline()}
+                </Timeline>
+            </Grid>
+            <Grid item xs={7}>
+                <Typography variant="h6" align="left">
+                    {this.experience.position}, {this.experience.company_name}
+                </Typography>
+                {this.renderWebsite()}
+
+                {/*<Typography variant="subtitle1">asdsd</Typography>*/}
+                <Typography variant="body1">
+                    {this.renderDescription()}
+                </Typography>
+            </Grid>
+        </Grid>)
+    }
+}
+
 function App() {
-    return (
-        <div className="App">
-            <CVExpItem/>
-            {/*<CVMain />*/}
-        </div>
-    );
+    return (<div className="App">
+        <ThemeProvider theme={theme}>
+            {/*<CVExpItem/>*/}
+            <CVMain/>
+        </ThemeProvider>
+    </div>);
 }
 
 export default App;
